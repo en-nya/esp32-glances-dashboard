@@ -1,9 +1,4 @@
 try:
-    import ujson as json
-except ImportError:
-    import json
-
-try:
     import urequests as requests
 except ImportError:
     requests = None
@@ -17,28 +12,33 @@ class GlancesClient:
 
     def fetch_summary(self):
         return {
-            "cpu_percent": self._get_value("/api/3/cpu/total"),
-            "mem_percent": self._get_value("/api/3/mem/percent"),
-            "disk_percent": self._get_disk_percent(),
+            "cpu_percent": self._cpu_percent(),
+            "mem_percent": self._mem_percent(),
+            "disk_percent": self._disk_percent(),
         }
 
-    def _get_value(self, path):
-        data = self._get_json(path)
-        if isinstance(data, dict):
-            value = data.get("value")
-            if value is None and len(data) == 1:
-                value = list(data.values())[0]
-            return value
-        return data
+    def _cpu_percent(self):
+        cpu = self._get_json("/api/4/cpu")
+        total = cpu.get("total")
+        if total is not None:
+            return total
 
-    def _get_disk_percent(self):
-        data = self._get_json("/api/3/fs")
-        if isinstance(data, list):
-            for item in data:
-                if item.get("mnt_point") == "/":
-                    return item.get("percent")
-            if data:
-                return data[0].get("percent")
+        idle = cpu.get("idle")
+        if idle is not None:
+            return max(0, 100 - idle)
+
+        return None
+
+    def _mem_percent(self):
+        return self._get_json("/api/4/mem").get("percent")
+
+    def _disk_percent(self):
+        fs_items = self._get_json("/api/4/fs")
+        for item in fs_items:
+            if item.get("mnt_point") in ("/", "/rootfs"):
+                return item.get("percent")
+        if fs_items:
+            return fs_items[0].get("percent")
         return None
 
     def _get_json(self, path):

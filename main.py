@@ -3,6 +3,7 @@ import time
 from config import REFRESH_INTERVAL_SECONDS
 from lib.display import Display
 from lib.glances_client import GlancesClient
+from lib.wifi_client import connect_wifi
 
 
 def format_percent(value):
@@ -13,9 +14,10 @@ def format_percent(value):
 
 def main():
     display = Display()
-    client = GlancesClient()
-
     display.show_message("Glances dashboard starting")
+
+    connect_wifi()
+    client = GlancesClient()
 
     while True:
         try:

@@ -11,9 +11,10 @@ fi
 
 mpremote connect "$PORT" fs cp boot.py :boot.py
 mpremote connect "$PORT" fs cp main.py :main.py
-mpremote connect "$PORT" fs cp config.py :config.py
+mpremote connect "$PORT" fs cp config.example.py :config.py
 mpremote connect "$PORT" fs mkdir :lib || true
 mpremote connect "$PORT" fs cp lib/pins.py :lib/pins.py
 mpremote connect "$PORT" fs cp lib/display.py :lib/display.py
 mpremote connect "$PORT" fs cp lib/glances_client.py :lib/glances_client.py
+mpremote connect "$PORT" fs cp lib/wifi_client.py :lib/wifi_client.py
 mpremote connect "$PORT" reset
