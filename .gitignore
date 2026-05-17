@@ -1,0 +1,7 @@
+config.py
+__pycache__/
+*.pyc
+.mpy-cross/
+.vscode/
+.claude/
+CLAUDE.md
