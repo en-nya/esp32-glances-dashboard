@@ -1,5 +1,5 @@
 # SPDX-License-Identifier: AGPL-3.0-or-later
-def connect_wifi():
+def connect_wifi(display=None):
     import network
     import time
 
@@ -20,14 +20,21 @@ def connect_wifi():
         print("Connecting to Wi-Fi...")
         wlan.connect(WIFI_SSID, WIFI_PASSWORD)
 
-        for _ in range(30):
+        anim = ["|", "/", "-", "\\"]
+        for i in range(30):
             if wlan.isconnected():
                 break
+            if display and display.ready:
+                display.show_message("WiFi {}".format(anim[i % 4]))
             time.sleep(1)
 
     if wlan.isconnected():
         print("Wi-Fi connected:", wlan.ifconfig())
+        if display and display.ready:
+            display.show_message("WiFi OK")
         return wlan
 
     print("Wi-Fi connection failed.")
+    if display and display.ready:
+        display.show_error("WiFi FAIL")
     return None

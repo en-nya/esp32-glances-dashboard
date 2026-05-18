@@ -13,13 +13,13 @@ class GlancesClient:
         self.status = {}
         self.changed = True
         self.tasks = (
-            {"name": "quicklook", "path": "/api/4/quicklook", "interval": 500, "next": 0, "handler": self._apply_quicklook},
-            {"name": "containers", "path": "/api/4/containers", "interval": 5000, "next": 0, "handler": self._apply_containers},
-            {"name": "network", "path": "/api/4/network", "interval": 1000, "next": 0, "handler": self._apply_network},
+            {"name": "quicklook", "path": "/api/4/quicklook", "interval": 1000, "next": 0, "handler": self._apply_quicklook},
+            {"name": "containers", "path": "/api/4/containers", "interval": 600000, "next": 0, "handler": self._apply_docker},
+            {"name": "network", "path": "/api/4/network", "interval": 5000, "next": 0, "handler": self._apply_network},
             {"name": "load", "path": "/api/4/load", "interval": 5000, "next": 0, "handler": self._apply_load},
             {"name": "sensors", "path": "/api/4/sensors", "interval": 5000, "next": 0, "handler": self._apply_sensors},
             {"name": "uptime", "path": "/api/4/uptime", "interval": 5000, "next": 0, "handler": self._apply_uptime},
-            {"name": "fs", "path": "/api/4/fs", "interval": 15000, "next": 0, "handler": self._apply_fs},
+            {"name": "fs", "path": "/api/4/fs", "interval": 600000, "next": 0, "handler": self._apply_fs},
         )
         self.task_index = 0
 
@@ -40,7 +40,9 @@ class GlancesClient:
 
         self.task_index = (selected_index + 1) % task_count
         selected["next"] = now + selected["interval"]
+        print("Fetching:", selected["path"])
         data = self._get_json(selected["path"], None)
+        print("Got data:", type(data), "len" if isinstance(data, (list, dict)) else "")
         if data is not None:
             selected["handler"](data)
         return self.changed
@@ -80,8 +82,16 @@ class GlancesClient:
         self._set("disk_used", disk.get("used"))
         self._set("disk_size", disk.get("size"))
 
-    def _apply_containers(self, containers):
-        docker = self._docker(containers)
+    def _apply_docker(self, data):
+        print("Docker API data:", data)
+        if isinstance(data, dict):
+            containers = data.get("containers", [])
+        elif isinstance(data, list):
+            containers = data
+        else:
+            containers = []
+        docker = self._parse_docker(containers)
+        print("Docker parsed:", docker)
         self._set("docker_total", docker.get("total", 0))
         self._set("docker_running", docker.get("running", 0))
 
@@ -123,7 +133,7 @@ class GlancesClient:
             return None
         return max(temps)
 
-    def _docker(self, containers):
+    def _parse_docker(self, containers):
         if not isinstance(containers, list):
             return {}
         running = 0
@@ -137,9 +147,11 @@ class GlancesClient:
         if requests is None:
             raise RuntimeError("urequests module is not available")
 
-        timeout = HTTP_TIMEOUT_SECONDS
-        if path in ("/api/4/containers", "/api/4/fs"):
-            timeout = max(HTTP_TIMEOUT_SECONDS, 4)
+        timeout = 1
+        if path == "/api/4/docker" or path == "/api/4/containers":
+            timeout = 5
+        elif path == "/api/4/fs":
+            timeout = 3
 
         response = None
         try:

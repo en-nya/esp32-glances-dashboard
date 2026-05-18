@@ -68,7 +68,7 @@ class ST7789:
         h = min(h, self.height - y)
         hi = color >> 8
         lo = color & 255
-        chunk_pixels = min(w * h, 512)
+        chunk_pixels = min(w * h, 256)
         chunk = bytearray(chunk_pixels * 2)
         for index in range(0, len(chunk), 2):
             chunk[index] = hi
@@ -81,7 +81,8 @@ class ST7789:
             count = min(remaining, chunk_pixels)
             self.spi.write(chunk[: count * 2])
             remaining -= count
-            sleep_ms(0)
+            if remaining > 0:
+                sleep_ms(1)
         self.cs.value(1)
 
     def fill(self, color):
@@ -208,13 +209,13 @@ class Display:
         self._card(4, 30, 102, 72, "CPU", self.CYAN)
         self._card(110, 30, 102, 72, "MEM", self.CYAN)
         self._card(216, 30, 100, 72, "DISK", self.GREEN)
-        self._card(4, 106, 124, 54, "NETWORK", self.CYAN)
+        self._card(4, 106, 110, 54, "NETWORK", self.CYAN)
         self._text(12, 126, "U", self.MUTED)
-        self._text(82, 126, "/s", self.MUTED)
+        self._text(72, 126, "/s", self.MUTED)
         self._text(12, 144, "D", self.MUTED)
-        self._text(82, 144, "/s", self.MUTED)
-        self._card(132, 106, 74, 54, "TEMP", self.ORANGE)
-        self._card(210, 106, 106, 54, "UPTIME", self.CYAN)
+        self._text(72, 144, "/s", self.MUTED)
+        self._card(118, 106, 74, 54, "TEMP", self.ORANGE)
+        self._card(196, 106, 120, 54, "UPTIME", self.CYAN)
         self._card(4, 164, 102, 52, "DOCKER", self.CYAN)
         self._card(110, 164, 206, 52, "LOAD", self.CYAN)
         self.layout_drawn = True
@@ -245,14 +246,14 @@ class Display:
         self._field("disk_size", 222, 82, 88, 8, self._bytes_pair(status.get("disk_used"), status.get("disk_size")), self.MUTED)
 
     def _update_network(self, status):
-        self._field("net_up", 30, 126, 50, 8, self._rate(status.get("net_tx_rate")), self.CYAN)
-        self._field("net_dn", 30, 144, 50, 8, self._rate(status.get("net_rx_rate")), self.GREEN)
+        self._field("net_up", 30, 126, 40, 8, self._rate(status.get("net_tx_rate")), self.CYAN)
+        self._field("net_dn", 30, 144, 40, 8, self._rate(status.get("net_rx_rate")), self.GREEN)
 
     def _update_temp(self, status):
-        self._field("temp", 138, 134, 56, 8, self._temp(status.get("temperature")), self.ORANGE)
+        self._field("temp", 124, 134, 56, 8, self._temp(status.get("temperature")), self.ORANGE)
 
     def _update_uptime(self, status):
-        self._field("uptime", 216, 134, 92, 8, self._uptime(status.get("uptime")), self.CYAN)
+        self._field("uptime", 202, 134, 106, 8, self._uptime(status.get("uptime")), self.CYAN)
 
     def _update_load(self, status):
         load = status.get("load")
@@ -326,22 +327,38 @@ class Display:
             import framebuf
 
             text = str(text)
-            width = max(1, len(text) * 16)
-            height = 16
-            buf = bytearray(width * height * 2)
-            fb = framebuf.FrameBuffer(buf, width, height, framebuf.RGB565)
-            fb.fill(self.BG)
+            char_spacing = 9
+            src_width = len(text) * char_spacing
+            src_height = 8
+            src_buf = bytearray(src_width * src_height * 2)
+            src_fb = framebuf.FrameBuffer(src_buf, src_width, src_height, framebuf.RGB565)
+            src_fb.fill(self.PANEL)
             for index, ch in enumerate(text):
-                bx = index * 16
-                fb.text(ch, bx, 0, color)
-            for index in range(0, len(buf), 2):
-                buf[index], buf[index + 1] = buf[index + 1], buf[index]
-            self.lcd._set_window(x, y, x + width - 1, y + height - 1)
+                bx = index * char_spacing
+                src_fb.text(ch, bx, 0, color)
+
+            dst_width = src_width * 2
+            dst_height = src_height * 2 + 4
+            dst_buf = bytearray(dst_width * dst_height * 2)
+            dst_fb = framebuf.FrameBuffer(dst_buf, dst_width, dst_height, framebuf.RGB565)
+            dst_fb.fill(self.PANEL)
+
+            for sy in range(src_height):
+                for sx in range(src_width):
+                    pixel = src_fb.pixel(sx, sy)
+                    dst_fb.pixel(sx * 2, sy * 2, pixel)
+                    dst_fb.pixel(sx * 2 + 1, sy * 2, pixel)
+                    dst_fb.pixel(sx * 2, sy * 2 + 1, pixel)
+                    dst_fb.pixel(sx * 2 + 1, sy * 2 + 1, pixel)
+
+            for index in range(0, len(dst_buf), 2):
+                dst_buf[index], dst_buf[index + 1] = dst_buf[index + 1], dst_buf[index]
+            self.lcd._set_window(x, y, x + dst_width - 1, y + dst_height - 1)
             self.lcd.cs.value(0)
             self.lcd.dc.value(1)
-            self.lcd.spi.write(buf)
+            self.lcd.spi.write(dst_buf)
             self.lcd.cs.value(1)
-            sleep_ms(0)
+            sleep_ms(1)
         except Exception as exc:
             print("Big text draw failed:", exc)
 
@@ -378,15 +395,9 @@ class Display:
         value = str(value)
         if "day" in value:
             days = value.split(" day")[0].strip()
-            rest = value.split(",", 1)[1].strip() if "," in value else "0:00"
-            parts = rest.split(":")
-            hours = parts[0] if len(parts) > 0 else "0"
-            minutes = parts[1] if len(parts) > 1 else "00"
-            return "{}d{}h{}m".format(days, hours, minutes)
-        parts = value.split(":")
-        if len(parts) >= 2:
-            return "{}h{}m".format(parts[0], parts[1])
-        return value[:10]
+            rest = value.split(",", 1)[1].strip() if "," in value else "0:00:00"
+            return "{}Day {}".format(days, rest)
+        return value
 
     def _load_short(self, value):
         if not value:
