@@ -115,6 +115,7 @@ class GlancesClient:
             if iso_time:
                 self._time_base = iso_time
                 self._time_base_ticks = time.ticks_ms()
+                print("Time synced:", iso_time)
 
     def _get_current_time(self):
         import time
@@ -125,11 +126,20 @@ class GlancesClient:
         elapsed_sec = elapsed_ms // 1000
 
         iso_str = self._time_base
-        if 'T' in iso_str:
-            time_part = iso_str.split('T')[1]
-            time_str = time_part.split('+')[0].split('-')[0]
-        else:
+        if 'T' not in iso_str:
             return None
+
+        date_part = iso_str.split('T')[0]
+        time_part = iso_str.split('T')[1]
+        time_str = time_part.split('+')[0].split('-')[0]
+
+        date_parts = date_part.split('-')
+        if len(date_parts) < 3:
+            return None
+
+        year = int(date_parts[0])
+        month = int(date_parts[1])
+        day = int(date_parts[2])
 
         time_parts = time_str.split(':')
         if len(time_parts) < 3:
@@ -140,6 +150,7 @@ class GlancesClient:
         seconds = int(time_parts[2].split('.')[0])
 
         total_seconds = hours * 3600 + minutes * 60 + seconds + elapsed_sec + 28800
+        day_offset = total_seconds // 86400
         total_seconds = total_seconds % 86400
 
         new_hours = total_seconds // 3600
@@ -147,7 +158,17 @@ class GlancesClient:
         new_minutes = remaining // 60
         new_seconds = remaining % 60
 
-        return '{:02d}:{:02d}:{:02d}'.format(new_hours, new_minutes, new_seconds)
+        if day_offset > 0:
+            day += day_offset
+            days_in_month = [31, 29 if year % 4 == 0 else 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31]
+            if day > days_in_month[month - 1]:
+                day = 1
+                month += 1
+                if month > 12:
+                    month = 1
+                    year += 1
+
+        return '{}-{:02d}-{:02d} {:02d}:{:02d}:{:02d}'.format(year, month, day, new_hours, new_minutes, new_seconds)
 
     def _set(self, key, value):
         if self.status.get(key) != value:

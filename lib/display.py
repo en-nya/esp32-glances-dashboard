@@ -95,15 +95,18 @@ class Display:
 
     BLACK = color565(0, 0, 0)
     BG = color565(0, 0, 0)
-    PANEL = color565(1, 5, 9)
-    BORDER = color565(18, 42, 50)
-    GRID = color565(8, 18, 22)
-    WHITE = color565(210, 220, 224)
-    MUTED = color565(90, 110, 118)
-    CYAN = color565(35, 220, 235)
-    GREEN = color565(88, 220, 70)
-    ORANGE = color565(255, 155, 18)
-    RED = color565(245, 70, 70)
+    PANEL = color565(2, 8, 12)
+    BORDER = color565(25, 50, 60)
+    GRID = color565(12, 25, 30)
+    WHITE = color565(220, 230, 235)
+    MUTED = color565(100, 120, 130)
+    CYAN = color565(50, 230, 245)
+    GREEN = color565(100, 230, 80)
+    ORANGE = color565(255, 165, 30)
+    RED = color565(255, 80, 80)
+    BLUE = color565(60, 150, 255)
+    PURPLE = color565(180, 100, 255)
+    YELLOW = color565(255, 220, 50)
 
     BRIGHTNESS_LEVELS = (20, 35, 50, 70, 85, 100)
 
@@ -114,6 +117,9 @@ class Display:
         self.layout_drawn = False
         self.last_error = None
         self.fields = {}
+        self.cpu_history = []
+        self.cpu_chart_x = 0
+        self.cpu_chart_prev_y = None
         self._init_backlight()
         self._init_lcd()
 
@@ -132,8 +138,7 @@ class Display:
         elif next_level <= 1:
             next_level = 1
         self.set_brightness(next_level)
-        self.fields.pop("footer_bright", None)
-        self._draw_footer()
+        self._field("footer_bright", 218, 224, 92, 8, "Light {}%".format(self.brightness), self.MUTED)
         return self.brightness
 
     def reverse_brightness_direction(self):
@@ -203,18 +208,18 @@ class Display:
         self._text(116, 10, "192.168.8.103", self.WHITE)
         self._text(252, 10, "ONLINE", self.GREEN)
         self.lcd.fill_rect(302, 11, 8, 8, self.GREEN)
-        self._card(4, 30, 102, 72, "CPU", self.CYAN)
-        self._card(110, 30, 102, 72, "MEM", self.CYAN)
+        self._card(4, 30, 102, 130, "CPU", self.BLUE)
+        self._card(110, 30, 102, 72, "MEM", self.PURPLE)
         self._card(216, 30, 100, 72, "DISK", self.GREEN)
-        self._card(4, 106, 128, 54, "NETWORK", self.CYAN)
-        self._text(12, 126, "U", self.MUTED)
-        self._text(82, 126, "/s", self.MUTED)
-        self._text(12, 144, "D", self.MUTED)
-        self._text(82, 144, "/s", self.MUTED)
-        self._card(136, 106, 54, 54, "TEMP", self.ORANGE)
-        self._card(194, 106, 122, 54, "UPTIME", self.CYAN)
-        self._card(4, 164, 102, 52, "DOCKER", self.CYAN)
-        self._card(110, 164, 206, 52, "LOAD", self.CYAN)
+        self._card(110, 106, 80, 54, "DOCKER", self.BLUE)
+        self._card(194, 106, 122, 54, "UPTIME", self.PURPLE)
+        self._card(4, 164, 128, 52, "NETWORK", self.CYAN)
+        self._text(12, 184, "U", self.MUTED)
+        self._text(100, 184, "/s", self.MUTED)
+        self._text(12, 202, "D", self.MUTED)
+        self._text(100, 202, "/s", self.MUTED)
+        self._card(136, 164, 124, 52, "LOAD", self.YELLOW)
+        self._card(264, 164, 52, 52, "TEMP", self.ORANGE)
         self.layout_drawn = True
 
     def _card(self, x, y, w, h, title, color):
@@ -231,12 +236,18 @@ class Display:
         return
 
     def _update_cpu(self, status):
-        self._field_big("cpu", 10, 50, 94, 20, status.get("cpu_percent"), self.CYAN)
-        self._field("cpu_load", 10, 82, 92, 8, "L " + self._load_short(status.get("load")), self.MUTED)
+        cpu = status.get("cpu_percent")
+        self._field_big("cpu", 10, 50, 94, 20, cpu, self.BLUE)
+        load = status.get("load")
+        if load and load[0] is not None:
+            self._field("cpu_freq", 10, 74, 92, 8, "Load {:.2f}".format(load[0]), self.MUTED)
+
+        if cpu is not None:
+            self._update_cpu_chart_column(int(cpu))
 
     def _update_memory(self, status):
-        self._field_big("mem", 116, 50, 94, 20, status.get("mem_percent"), self.CYAN)
-        self._bar(116, 84, 86, 6, status.get("mem_percent"), self.CYAN)
+        self._field_big("mem", 116, 50, 94, 20, status.get("mem_percent"), self.PURPLE)
+        self._bar(116, 84, 86, 6, status.get("mem_percent"), self.PURPLE)
 
     def _update_disk(self, status):
         self._field_big("disk", 222, 50, 92, 20, status.get("disk_percent"), self.GREEN)
@@ -247,8 +258,8 @@ class Display:
         total_up = self._bytes_compact(status.get("net_tx_total"))
         rate_dn = self._rate(status.get("net_rx_rate"))
         total_dn = self._bytes_compact(status.get("net_rx_total"))
-        self._field("net_up", 30, 126, 80, 8, "{} /s {}".format(rate_up, total_up), self.CYAN)
-        self._field("net_dn", 30, 144, 80, 8, "{} /s {}".format(rate_dn, total_dn), self.GREEN)
+        self._field("net_up", 30, 184, 96, 8, "{}/s {}".format(rate_up, total_up), self.CYAN)
+        self._field("net_dn", 30, 202, 96, 8, "{}/s {}".format(rate_dn, total_dn), self.GREEN)
 
     def _update_temp(self, status):
         temp = status.get("temperature")
@@ -260,31 +271,31 @@ class Display:
             color = self.ORANGE
         else:
             color = self.RED
-        self._text(141, 111, "TEMP", color)
-        self._field("temp", 142, 134, 42, 8, self._temp(temp), color)
+        self._text(269, 169, "TEMP", color)
+        self._field("temp", 270, 192, 42, 8, self._temp(temp), color)
 
     def _update_uptime(self, status):
-        self._field("uptime", 200, 134, 108, 8, self._uptime(status.get("uptime")), self.CYAN)
+        self._field("uptime", 200, 134, 108, 8, self._uptime(status.get("uptime")), self.PURPLE)
 
     def _update_load(self, status):
         load = status.get("load")
         if load and load[0] is not None:
-            self._field("load1", 116, 186, 88, 8, "1m {:.2f}".format(load[0]), self.CYAN)
+            self._field("load1", 142, 186, 58, 8, "1m {:.2f}".format(load[0]), self.YELLOW)
             load5 = "--" if len(load) < 2 or load[1] is None else "{:.1f}".format(load[1])
             load15 = "--" if len(load) < 3 or load[2] is None else "{:.1f}".format(load[2])
-            self._field("load2", 116, 202, 88, 8, "5m {} 15m {}".format(load5, load15), self.MUTED)
+            self._field("load2", 142, 202, 58, 8, "5m {} 15m ".format(load5, load15), self.MUTED)
         else:
-            self._field("load1", 116, 194, 40, 8, "--", self.CYAN)
+            self._field("load1", 142, 194, 40, 8, "--", self.YELLOW)
 
     def _update_docker(self, status):
         total = status.get("docker_total")
         running = status.get("docker_running")
         if total is None:
-            self._field("docker", 12, 186, 86, 8, "--", self.MUTED)
+            self._field("docker", 116, 128, 68, 8, "--", self.MUTED)
         else:
             stopped = total - running
-            self._field("docker_top", 12, 186, 88, 8, "RUN {}/{}".format(running, total), self.GREEN if stopped == 0 else self.WHITE)
-            self._field("docker_mid", 12, 202, 88, 8, "STOP {}".format(stopped), self.RED if stopped else self.MUTED)
+            self._field("docker_top", 116, 128, 68, 8, "RUN {}/{}".format(running, total), self.GREEN if stopped == 0 else self.BLUE)
+            self._field("docker_mid", 116, 144, 68, 8, "STOP {}".format(stopped), self.RED if stopped else self.MUTED)
 
     def _draw_footer(self, status=None):
         if self.last_error:
@@ -292,7 +303,7 @@ class Display:
         else:
             time_str = status.get('current_time') if status else None
             if time_str:
-                self._field("footer_left", 8, 224, 120, 8, "UTC+8 " + time_str, self.CYAN)
+                self._field("footer_left", 8, 224, 120, 8, time_str, self.CYAN)
             else:
                 self._field("footer_left", 8, 224, 120, 8, "Syncing...", self.MUTED)
         self._field("footer_bright", 218, 224, 92, 8, "Light {}%".format(self.brightness), self.MUTED)
@@ -474,3 +485,114 @@ class Display:
             self._docker(status),
             " ERR " + error if error else "",
         )
+
+    def _draw_cpu_chart(self, x, y, w, h):
+        self.lcd.fill_rect(x, y, w, h, self.PANEL)
+
+        for percent in (25, 50, 75):
+            line_y = y + h - int(percent * h / 100)
+            for i in range(0, w, 4):
+                self.lcd.fill_rect(x + i, line_y, 2, 1, self.GRID)
+
+        if len(self.cpu_history) < 2:
+            return
+
+        step = max(1, w // len(self.cpu_history))
+        for i in range(len(self.cpu_history) - 1):
+            v1 = self.cpu_history[i]
+            v2 = self.cpu_history[i + 1]
+            y1 = y + h - int(v1 * h / 100)
+            y2 = y + h - int(v2 * h / 100)
+            x1 = x + i * step
+            x2 = x + (i + 1) * step
+            self.lcd.fill_rect(x1, y1, 1, 1, self.BLUE)
+            if abs(x2 - x1) <= 1 and abs(y2 - y1) <= 1:
+                self.lcd.fill_rect(x2, y2, 1, 1, self.BLUE)
+            else:
+                dx = x2 - x1
+                dy = y2 - y1
+                steps = max(abs(dx), abs(dy))
+                if steps > 0:
+                    for s in range(steps + 1):
+                        px = x1 + s * dx // steps
+                        py = y1 + s * dy // steps
+                        self.lcd.fill_rect(px, py, 1, 1, self.BLUE)
+
+    def _update_cpu_chart_column(self, cpu_value):
+        x, y, w, h = 10, 86, 92, 60
+
+        if self.cpu_chart_x >= w:
+            self.lcd.fill_rect(x, y, w, h, self.PANEL)
+            for percent in (25, 50, 75):
+                line_y = y + h - int(percent * h / 100)
+                for i in range(0, w, 4):
+                    self.lcd.fill_rect(x + i, line_y, 2, 1, self.GRID)
+            self.cpu_chart_x = 0
+            self.cpu_chart_prev_y = None
+
+        new_y = y + h - int(cpu_value * h / 100)
+        col_x = x + self.cpu_chart_x
+
+        self.lcd.fill_rect(col_x, y, 1, h, self.PANEL)
+
+        for percent in (25, 50, 75):
+            line_y = y + h - int(percent * h / 100)
+            if line_y >= y and line_y < y + h:
+                self.lcd.fill_rect(col_x, line_y, 1, 1, self.GRID)
+
+        if self.cpu_chart_prev_y is not None:
+            dy = abs(new_y - self.cpu_chart_prev_y)
+            if dy <= 1:
+                self.lcd.fill_rect(col_x, new_y, 1, 1, self.BLUE)
+            elif dy < 20:
+                steps = dy
+                dy_sign = 1 if new_y > self.cpu_chart_prev_y else -1
+                for s in range(steps + 1):
+                    py = self.cpu_chart_prev_y + s * dy_sign
+                    self.lcd.fill_rect(col_x, py, 1, 1, self.BLUE)
+            else:
+                self.lcd.fill_rect(col_x, self.cpu_chart_prev_y, 1, 1, self.BLUE)
+                self.lcd.fill_rect(col_x, new_y, 1, 1, self.BLUE)
+        else:
+            self.lcd.fill_rect(col_x, new_y, 1, 1, self.BLUE)
+
+        self.cpu_chart_prev_y = new_y
+        self.cpu_chart_x += 1
+
+
+    def _draw_line(self, x1, y1, x2, y2, color):
+        dx = abs(x2 - x1)
+        dy = abs(y2 - y1)
+        sx = 1 if x1 < x2 else -1
+        sy = 1 if y1 < y2 else -1
+        err = dx - dy
+        while True:
+            self.lcd.fill_rect(x1, y1, 2, 2, color)
+            if x1 == x2 and y1 == y2:
+                break
+            e2 = 2 * err
+            if e2 > -dy:
+                err -= dy
+                x1 += sx
+            if e2 < dx:
+                err += dx
+                y1 += sy
+
+    def _draw_line_fb(self, fb, x1, y1, x2, y2, color):
+        dx = abs(x2 - x1)
+        dy = abs(y2 - y1)
+        sx = 1 if x1 < x2 else -1
+        sy = 1 if y1 < y2 else -1
+        err = dx - dy
+        while True:
+            fb.pixel(x1, y1, color)
+            if x1 == x2 and y1 == y2:
+                break
+            e2 = 2 * err
+            if e2 > -dy:
+                err -= dy
+                x1 += sx
+            if e2 < dx:
+                err += dx
+                y1 += sy
+
