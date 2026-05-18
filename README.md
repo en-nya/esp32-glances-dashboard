@@ -2,6 +2,9 @@
 
 ESP32-32E MicroPython touchscreen dashboard for displaying Debian server status from Glances on the local network.
 
+This project is licensed under the GNU Affero General Public License v3.0 or later.
+Source code: https://github.com/en-nya/esp32-glances-dashboard
+
 ## Hardware
 
 - ESP32-WROOM-32E-N4 board
