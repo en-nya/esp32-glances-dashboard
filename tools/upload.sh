@@ -17,4 +17,5 @@ mpremote connect "$PORT" fs cp lib/pins.py :lib/pins.py
 mpremote connect "$PORT" fs cp lib/display.py :lib/display.py
 mpremote connect "$PORT" fs cp lib/glances_client.py :lib/glances_client.py
 mpremote connect "$PORT" fs cp lib/wifi_client.py :lib/wifi_client.py
+mpremote connect "$PORT" fs cp lib/backlight_button.py :lib/backlight_button.py
 mpremote connect "$PORT" reset

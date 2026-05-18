@@ -1,40 +1,34 @@
 import time
 
-from config import REFRESH_INTERVAL_SECONDS
+from lib.backlight_button import BacklightButton
 from lib.display import Display
 from lib.glances_client import GlancesClient
 from lib.wifi_client import connect_wifi
 
-
-def format_percent(value):
-    if value is None:
-        return "--"
-    return "{:.1f}%".format(value)
+DRAW_FRAME_MS = 16
 
 
 def main():
     display = Display()
-    display.show_message("Glances dashboard starting")
+    button = BacklightButton(display)
 
     connect_wifi()
     client = GlancesClient()
+    force_draw = True
 
     while True:
-        try:
-            status = client.fetch_summary()
-            line = "CPU {} | MEM {} | DISK {}".format(
-                format_percent(status.get("cpu_percent")),
-                format_percent(status.get("mem_percent")),
-                format_percent(status.get("disk_percent")),
-            )
-            print(line)
-            display.show_message(line)
-        except Exception as exc:
-            message = "Glances error: {}".format(exc)
-            print(message)
-            display.show_message(message)
+        now = time.ticks_ms()
 
-        time.sleep(REFRESH_INTERVAL_SECONDS)
+        button.poll()
+
+        if client.poll(now):
+            force_draw = True
+
+        if force_draw:
+            display.draw_dashboard(client.snapshot())
+            force_draw = False
+
+        time.sleep_ms(DRAW_FRAME_MS)
 
 
 main()
