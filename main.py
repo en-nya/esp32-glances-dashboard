@@ -25,16 +25,14 @@ def main():
         try:
             if client.poll(now):
                 force_draw = True
-        except Exception as e:
-            print("Client poll error:", e)
+        except Exception:
             time.sleep_ms(100)
 
         if force_draw:
             try:
                 display.draw_dashboard(client.snapshot())
                 force_draw = False
-            except Exception as e:
-                print("Display error:", e)
+            except Exception:
                 time.sleep_ms(100)
 
         time.sleep_ms(DRAW_FRAME_MS)

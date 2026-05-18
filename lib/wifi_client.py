@@ -10,31 +10,29 @@ def connect_wifi(display=None):
         WIFI_PASSWORD = ""
 
     if not WIFI_SSID:
-        print("Wi-Fi is not configured. Copy config.example.py to config.py first.")
         return None
 
     wlan = network.WLAN(network.STA_IF)
     wlan.active(True)
 
     if not wlan.isconnected():
-        print("Connecting to Wi-Fi...")
         wlan.connect(WIFI_SSID, WIFI_PASSWORD)
 
-        anim = ["|", "/", "-", "\\"]
         for i in range(30):
             if wlan.isconnected():
                 break
             if display and display.ready:
-                display.show_message("WiFi {}".format(anim[i % 4]))
+                progress = min(i * 3, 100)
+                bar_len = progress // 10
+                bar = "=" * bar_len + ">" + " " * (10 - bar_len)
+                display.show_message("[{}] {}%".format(bar, progress))
             time.sleep(1)
 
     if wlan.isconnected():
-        print("Wi-Fi connected:", wlan.ifconfig())
         if display and display.ready:
-            display.show_message("WiFi OK")
+            display.show_message("WiFi Connected!")
         return wlan
 
-    print("Wi-Fi connection failed.")
     if display and display.ready:
         display.show_error("WiFi FAIL")
     return None

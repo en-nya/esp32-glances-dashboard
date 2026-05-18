@@ -6,7 +6,7 @@ from lib.pins import BOOT_BUTTON
 
 
 class BacklightButton:
-    def __init__(self, display, long_press_ms=500, repeat_ms=35):
+    def __init__(self, display, long_press_ms=500, repeat_ms=120):
         self.display = display
         self.long_press_ms = long_press_ms
         self.repeat_ms = repeat_ms

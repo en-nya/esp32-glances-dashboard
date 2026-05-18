@@ -146,13 +146,11 @@ class Display:
         return self.adjust_brightness()
 
     def show_message(self, message):
-        print("DISPLAY:", message)
         if self.ready:
             self._draw_layout(force=True)
             self._field("footer_left", 8, 224, 180, 8, str(message)[:24], self.MUTED)
 
     def show_error(self, message, status=None):
-        print("DISPLAY ERROR:", message)
         self.last_error = str(message)[:24]
         if status:
             self.draw_dashboard(status, self.last_error)
@@ -174,7 +172,7 @@ class Display:
         self._update_uptime(status)
         self._update_load(status)
         self._update_docker(status)
-        self._draw_footer()
+        self._draw_footer(status)
 
     def _init_backlight(self):
         self.backlight = Pin(LCD_BL, Pin.OUT)
@@ -188,13 +186,12 @@ class Display:
 
     def _init_lcd(self):
         try:
-            spi = SPI(1, baudrate=40000000, polarity=0, phase=0, sck=Pin(LCD_SCLK), mosi=Pin(LCD_MOSI))
+            spi = SPI(1, baudrate=80000000, polarity=0, phase=0, sck=Pin(LCD_SCLK), mosi=Pin(LCD_MOSI))
             self.lcd = ST7789(spi, self.WIDTH, self.HEIGHT, Pin(LCD_CS), Pin(LCD_DC), Pin(LCD_RST))
             self.ready = True
             self.lcd.fill(self.BG)
-        except Exception as exc:
+        except Exception:
             self.ready = False
-            print("Display init failed:", exc)
 
     def _draw_layout(self, force=False):
         if self.layout_drawn and not force:
@@ -209,13 +206,13 @@ class Display:
         self._card(4, 30, 102, 72, "CPU", self.CYAN)
         self._card(110, 30, 102, 72, "MEM", self.CYAN)
         self._card(216, 30, 100, 72, "DISK", self.GREEN)
-        self._card(4, 106, 110, 54, "NETWORK", self.CYAN)
+        self._card(4, 106, 128, 54, "NETWORK", self.CYAN)
         self._text(12, 126, "U", self.MUTED)
-        self._text(72, 126, "/s", self.MUTED)
+        self._text(82, 126, "/s", self.MUTED)
         self._text(12, 144, "D", self.MUTED)
-        self._text(72, 144, "/s", self.MUTED)
-        self._card(118, 106, 74, 54, "TEMP", self.ORANGE)
-        self._card(196, 106, 120, 54, "UPTIME", self.CYAN)
+        self._text(82, 144, "/s", self.MUTED)
+        self._card(136, 106, 54, 54, "TEMP", self.ORANGE)
+        self._card(194, 106, 122, 54, "UPTIME", self.CYAN)
         self._card(4, 164, 102, 52, "DOCKER", self.CYAN)
         self._card(110, 164, 206, 52, "LOAD", self.CYAN)
         self.layout_drawn = True
@@ -246,14 +243,28 @@ class Display:
         self._field("disk_size", 222, 82, 88, 8, self._bytes_pair(status.get("disk_used"), status.get("disk_size")), self.MUTED)
 
     def _update_network(self, status):
-        self._field("net_up", 30, 126, 40, 8, self._rate(status.get("net_tx_rate")), self.CYAN)
-        self._field("net_dn", 30, 144, 40, 8, self._rate(status.get("net_rx_rate")), self.GREEN)
+        rate_up = self._rate(status.get("net_tx_rate"))
+        total_up = self._bytes_compact(status.get("net_tx_total"))
+        rate_dn = self._rate(status.get("net_rx_rate"))
+        total_dn = self._bytes_compact(status.get("net_rx_total"))
+        self._field("net_up", 30, 126, 80, 8, "{} /s {}".format(rate_up, total_up), self.CYAN)
+        self._field("net_dn", 30, 144, 80, 8, "{} /s {}".format(rate_dn, total_dn), self.GREEN)
 
     def _update_temp(self, status):
-        self._field("temp", 124, 134, 56, 8, self._temp(status.get("temperature")), self.ORANGE)
+        temp = status.get("temperature")
+        if temp is None:
+            color = self.MUTED
+        elif temp < 50:
+            color = self.GREEN
+        elif temp < 70:
+            color = self.ORANGE
+        else:
+            color = self.RED
+        self._text(141, 111, "TEMP", color)
+        self._field("temp", 142, 134, 42, 8, self._temp(temp), color)
 
     def _update_uptime(self, status):
-        self._field("uptime", 202, 134, 106, 8, self._uptime(status.get("uptime")), self.CYAN)
+        self._field("uptime", 200, 134, 108, 8, self._uptime(status.get("uptime")), self.CYAN)
 
     def _update_load(self, status):
         load = status.get("load")
@@ -275,11 +286,15 @@ class Display:
             self._field("docker_top", 12, 186, 88, 8, "RUN {}/{}".format(running, total), self.GREEN if stopped == 0 else self.WHITE)
             self._field("docker_mid", 12, 202, 88, 8, "STOP {}".format(stopped), self.RED if stopped else self.MUTED)
 
-    def _draw_footer(self):
+    def _draw_footer(self, status=None):
         if self.last_error:
             self._field("footer_left", 8, 224, 200, 8, "ERR " + self.last_error[:24], self.RED)
         else:
-            self._field("footer_left", 8, 224, 120, 8, "60Hz async", self.MUTED)
+            time_str = status.get('current_time') if status else None
+            if time_str:
+                self._field("footer_left", 8, 224, 120, 8, "UTC+8 " + time_str, self.CYAN)
+            else:
+                self._field("footer_left", 8, 224, 120, 8, "Syncing...", self.MUTED)
         self._field("footer_bright", 218, 224, 92, 8, "Light {}%".format(self.brightness), self.MUTED)
 
     def _field(self, key, x, y, w, h, text, color):
@@ -319,8 +334,8 @@ class Display:
             self.lcd.dc.value(1)
             self.lcd.spi.write(buf)
             self.lcd.cs.value(1)
-        except Exception as exc:
-            print("Text draw failed:", exc)
+        except Exception:
+            pass
 
     def _text_big(self, x, y, text, color):
         try:
@@ -359,8 +374,8 @@ class Display:
             self.lcd.spi.write(dst_buf)
             self.lcd.cs.value(1)
             sleep_ms(1)
-        except Exception as exc:
-            print("Big text draw failed:", exc)
+        except Exception:
+            pass
 
     def _draw_big_char(self, fb, x, y, ch, color):
         fb.text(ch, x, y, color)
@@ -382,6 +397,19 @@ class Display:
             return "--"
         if value >= 1024 * 1024:
             return "{:.1f}M".format(value / 1024 / 1024)
+        if value >= 1024:
+            return "{:.0f}K".format(value / 1024)
+        return "{}B".format(int(value))
+
+    def _bytes_compact(self, value):
+        if value is None:
+            return "--"
+        if value >= 1024 * 1024 * 1024:
+            v = value / 1024 / 1024 / 1024
+            return "{:.1f}G".format(v) if v < 100 else "{:.0f}G".format(v)
+        if value >= 1024 * 1024:
+            v = value / 1024 / 1024
+            return "{:.1f}M".format(v) if v < 100 else "{:.0f}M".format(v)
         if value >= 1024:
             return "{:.0f}K".format(value / 1024)
         return "{}B".format(int(value))
