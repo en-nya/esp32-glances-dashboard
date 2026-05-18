@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
 from time import sleep_ms, ticks_diff, ticks_ms
 
 from machine import Pin, SPI

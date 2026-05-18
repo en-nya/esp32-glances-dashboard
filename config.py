@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
 WIFI_SSID = "your-wifi-name"
 WIFI_PASSWORD = "your-wifi-password"
 

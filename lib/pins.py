@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
 LCD_MOSI = 13
 LCD_SCLK = 14
 LCD_CS = 15
