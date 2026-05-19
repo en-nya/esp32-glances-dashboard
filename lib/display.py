@@ -68,7 +68,7 @@ class ST7789:
         h = min(h, self.height - y)
         hi = color >> 8
         lo = color & 255
-        chunk_pixels = min(w * h, 256)
+        chunk_pixels = min(w * h, 1024)
         chunk = bytearray(chunk_pixels * 2)
         for index in range(0, len(chunk), 2):
             chunk[index] = hi
@@ -81,8 +81,6 @@ class ST7789:
             count = min(remaining, chunk_pixels)
             self.spi.write(chunk[: count * 2])
             remaining -= count
-            if remaining > 0:
-                sleep_ms(1)
         self.cs.value(1)
 
     def fill(self, color):
@@ -124,7 +122,7 @@ class Display:
         self._init_lcd()
 
     def set_brightness(self, level):
-        level = max(1, min(100, int(level)))
+        level = max(10, min(100, int(level)))
         self.brightness = level
         if hasattr(self, "backlight_pwm") and self.backlight_pwm:
             self.backlight_pwm.duty(int(level * 1023 / 100))
@@ -135,8 +133,8 @@ class Display:
         next_level = self.brightness + self.brightness_direction * 5
         if next_level >= 100:
             next_level = 100
-        elif next_level <= 1:
-            next_level = 1
+        elif next_level <= 10:
+            next_level = 10
         self.set_brightness(next_level)
         self._field("footer_bright", 218, 224, 92, 8, "Light {}%".format(self.brightness), self.MUTED)
         return self.brightness
