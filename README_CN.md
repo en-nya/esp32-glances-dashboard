@@ -78,8 +78,6 @@ HTTP_TIMEOUT_SECONDS = 2
 REFRESH_INTERVAL_SECONDS = 5
 ```
 
-**注意**: `config.py` 已被 git 忽略以保护您的凭据。
-
 ### 3. 上传文件到 ESP32
 
 使用 `ampy`、`rshell` 或 Thonny IDE 等工具将所有项目文件上传到 ESP32：
@@ -173,7 +171,6 @@ esp32-glances-dashboard/
 ├── boot.py                 # 启动初始化
 ├── main.py                 # 应用程序入口
 ├── config.example.py       # 配置模板
-├── config.py              # 您的配置（git 忽略）
 ├── IO.md                  # 硬件引脚映射文档
 ├── lib/
 │   ├── pins.py           # 引脚定义
