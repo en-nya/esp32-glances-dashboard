@@ -203,7 +203,7 @@ class Display:
             return
         self.lcd.fill(self.BG)
         self._rect(4, 4, 312, 22, self.BORDER)
-        self._text(10, 10, "pi-server", self.WHITE)
+        self._text(10, 10, "Glances", self.WHITE)
         self._text(96, 10, "|", self.MUTED)
         self._text(116, 10, "192.168.8.103", self.WHITE)
         self._text(252, 10, "ONLINE", self.GREEN)
