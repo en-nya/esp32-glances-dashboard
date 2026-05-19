@@ -238,9 +238,7 @@ class Display:
     def _update_cpu(self, status):
         cpu = status.get("cpu_percent")
         self._field_big("cpu", 10, 50, 94, 20, cpu, self.BLUE)
-        load = status.get("load")
-        if load and load[0] is not None:
-            self._field("cpu_freq", 10, 74, 92, 8, "Load {:.2f}".format(load[0]), self.MUTED)
+        self._field("cpu_freq", 10, 74, 92, 8, "Freq --", self.MUTED)
 
         if cpu is not None:
             self._update_cpu_chart_column(int(cpu))
@@ -280,12 +278,16 @@ class Display:
     def _update_load(self, status):
         load = status.get("load")
         if load and load[0] is not None:
-            self._field("load1", 142, 186, 58, 8, "1m {:.2f}".format(load[0]), self.YELLOW)
-            load5 = "--" if len(load) < 2 or load[1] is None else "{:.1f}".format(load[1])
-            load15 = "--" if len(load) < 3 or load[2] is None else "{:.1f}".format(load[2])
-            self._field("load2", 142, 202, 58, 8, "5m {} 15m ".format(load5, load15), self.MUTED)
+            self._field("load_header", 142, 172, 110, 8, "1M    5M    15M", self.MUTED)
+            load1 = "{:.2f}".format(load[0]) if load[0] is not None else "--"
+            load5 = "{:.1f}".format(load[1]) if len(load) > 1 and load[1] is not None else "--"
+            load15 = "{:.1f}".format(load[2]) if len(load) > 2 and load[2] is not None else "--"
+            self._field("load1_val", 142, 186, 32, 8, load1, self.YELLOW)
+            self._field("load5_val", 182, 186, 32, 8, load5, self.MUTED)
+            self._field("load15_val", 222, 186, 32, 8, load15, self.MUTED)
         else:
-            self._field("load1", 142, 194, 40, 8, "--", self.YELLOW)
+            self._field("load_header", 142, 172, 110, 8, "1M    5M    15M", self.MUTED)
+            self._field("load1_val", 142, 186, 32, 8, "--", self.YELLOW)
 
     def _update_docker(self, status):
         total = status.get("docker_total")
@@ -557,7 +559,7 @@ class Display:
             self.lcd.fill_rect(col_x, new_y, 1, 1, self.BLUE)
 
         self.cpu_chart_prev_y = new_y
-        self.cpu_chart_x += 1
+        self.cpu_chart_x += 2
 
 
     def _draw_line(self, x1, y1, x2, y2, color):
