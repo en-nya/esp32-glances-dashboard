@@ -180,6 +180,9 @@ class GlancesClient:
             return
         self._set("cpu_percent", data.get("cpu"))
         self._set("mem_percent", data.get("mem"))
+        cpu_hz = data.get("cpu_hz_current")
+        if cpu_hz:
+            self._set("cpu_freq", cpu_hz / 1000000000)
 
     def _apply_network(self, items):
         self._set("net_rx_rate", self._network_rate(items, "bytes_recv_rate_per_sec"))

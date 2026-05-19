@@ -238,7 +238,9 @@ class Display:
     def _update_cpu(self, status):
         cpu = status.get("cpu_percent")
         self._field_big("cpu", 10, 50, 94, 20, cpu, self.BLUE)
-        self._field("cpu_freq", 10, 74, 92, 8, "Freq --", self.MUTED)
+        freq = status.get("cpu_freq")
+        freq_text = "{:.2f}GHz".format(freq) if freq else "Freq --"
+        self._field("cpu_freq", 10, 74, 92, 8, freq_text, self.MUTED)
 
         if cpu is not None:
             self._update_cpu_chart_column(int(cpu))
@@ -278,16 +280,16 @@ class Display:
     def _update_load(self, status):
         load = status.get("load")
         if load and load[0] is not None:
-            self._field("load_header", 142, 172, 110, 8, "1M    5M    15M", self.MUTED)
+            self._field("load_header", 142, 182, 110, 8, "1M   5M   15M", self.MUTED)
             load1 = "{:.2f}".format(load[0]) if load[0] is not None else "--"
             load5 = "{:.1f}".format(load[1]) if len(load) > 1 and load[1] is not None else "--"
             load15 = "{:.1f}".format(load[2]) if len(load) > 2 and load[2] is not None else "--"
-            self._field("load1_val", 142, 186, 32, 8, load1, self.YELLOW)
-            self._field("load5_val", 182, 186, 32, 8, load5, self.MUTED)
-            self._field("load15_val", 222, 186, 32, 8, load15, self.MUTED)
+            self._field("load1_val", 142, 200, 32, 8, load1, self.YELLOW)
+            self._field("load5_val", 182, 200, 32, 8, load5, self.MUTED)
+            self._field("load15_val", 222, 200, 32, 8, load15, self.MUTED)
         else:
-            self._field("load_header", 142, 172, 110, 8, "1M    5M    15M", self.MUTED)
-            self._field("load1_val", 142, 186, 32, 8, "--", self.YELLOW)
+            self._field("load_header", 142, 182, 110, 8, "1M   5M   15M", self.MUTED)
+            self._field("load1_val", 142, 200, 32, 8, "--", self.YELLOW)
 
     def _update_docker(self, status):
         total = status.get("docker_total")
