@@ -78,8 +78,6 @@ HTTP_TIMEOUT_SECONDS = 2
 REFRESH_INTERVAL_SECONDS = 5
 ```
 
-**Note**: `config.py` is git-ignored to protect your credentials.
-
 ### 3. Upload Files to ESP32
 
 Upload all project files to your ESP32 using a tool like `ampy`, `rshell`, or Thonny IDE:
@@ -173,7 +171,6 @@ esp32-glances-dashboard/
 ├── boot.py                 # Boot initialization
 ├── main.py                 # Application entry point
 ├── config.example.py       # Configuration template
-├── config.py              # Your configuration (git-ignored)
 ├── IO.md                  # Hardware pin mapping documentation
 ├── lib/
 │   ├── pins.py           # Pin definitions
