@@ -1,5 +1,7 @@
 # ESP32 Glances 监控仪表盘
 
+中文文档 | [English](README.md)
+
 基于 ESP32 和触摸屏的实时服务器监控仪表盘，使用 MicroPython 开发。通过 WiFi 从 [Glances](https://nicolargo.github.io/glances/) 监控服务器获取并显示系统指标。
 
 ![License](https://img.shields.io/badge/license-AGPL--3.0--or--later-blue.svg)
@@ -172,14 +174,12 @@ esp32-glances-dashboard/
 ├── main.py                 # 应用程序入口
 ├── config.example.py       # 配置模板
 ├── IO.md                  # 硬件引脚映射文档
-├── lib/
-│   ├── pins.py           # 引脚定义
-│   ├── wifi_client.py    # WiFi 连接和启动动画
-│   ├── glances_client.py # Glances API 客户端和轮询
-│   ├── display.py        # ST7789 驱动和仪表盘 UI
-│   └── backlight_button.py # 亮度控制按钮处理
-└── tools/
-    └── font_converter.py  # 字体转换工具
+└── lib/
+    ├── pins.py           # 引脚定义
+    ├── wifi_client.py    # WiFi 连接和启动动画
+    ├── glances_client.py # Glances API 客户端和轮询
+    ├── display.py        # ST7789 驱动和仪表盘 UI
+    └── backlight_button.py # 亮度控制按钮处理
 ```
 
 ## 使用的 API 端点

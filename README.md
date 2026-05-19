@@ -1,5 +1,7 @@
 # ESP32 Glances Dashboard
 
+[中文文档](README_CN.md) | English
+
 A real-time server monitoring dashboard for ESP32 with touchscreen display, powered by MicroPython. Fetches and displays system metrics from [Glances](https://nicolargo.github.io/glances/) monitoring server over WiFi.
 
 ![License](https://img.shields.io/badge/license-AGPL--3.0--or--later-blue.svg)
@@ -172,14 +174,12 @@ esp32-glances-dashboard/
 ├── main.py                 # Application entry point
 ├── config.example.py       # Configuration template
 ├── IO.md                  # Hardware pin mapping documentation
-├── lib/
-│   ├── pins.py           # Pin definitions
-│   ├── wifi_client.py    # WiFi connection with boot animation
-│   ├── glances_client.py # Glances API client with polling
-│   ├── display.py        # ST7789 driver and dashboard UI
-│   └── backlight_button.py # Button handler for brightness control
-└── tools/
-    └── font_converter.py  # Font conversion utilities
+└── lib/
+    ├── pins.py           # Pin definitions
+    ├── wifi_client.py    # WiFi connection with boot animation
+    ├── glances_client.py # Glances API client with polling
+    ├── display.py        # ST7789 driver and dashboard UI
+    └── backlight_button.py # Button handler for brightness control
 ```
 
 ## API Endpoints Used
