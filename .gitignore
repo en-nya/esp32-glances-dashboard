@@ -3,7 +3,10 @@ __pycache__/
 *.pyc
 .mpy-cross/
 .vscode/
+.agents/
 .claude/
 CLAUDE.md
 config.example.py
 DejaVu_Sans/
+DEMO/
+skills-lock.json

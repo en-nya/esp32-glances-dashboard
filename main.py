@@ -16,6 +16,7 @@ def main():
     connect_wifi(display)
     client = GlancesClient()
     force_draw = True
+    last_draw = 0
 
     while True:
         now = time.ticks_ms()
@@ -28,14 +29,15 @@ def main():
         except Exception:
             time.sleep_ms(100)
 
-        if force_draw:
+        if force_draw and time.ticks_diff(now, last_draw) >= DRAW_FRAME_MS:
             try:
                 display.draw_dashboard(client.snapshot())
                 force_draw = False
+                last_draw = now
             except Exception:
                 time.sleep_ms(100)
 
-        time.sleep_ms(DRAW_FRAME_MS)
+        time.sleep_ms(10)
 
 
 main()

@@ -86,6 +86,14 @@ class ST7789:
     def fill(self, color):
         self.fill_rect(0, 0, self.width, self.height, color)
 
+    def blit_rgb565(self, x, y, w, h, buf):
+        """快速传输RGB565 framebuffer到LCD"""
+        self._set_window(x, y, x + w - 1, y + h - 1)
+        self.cs.value(0)
+        self.dc.value(1)
+        self.spi.write(buf)
+        self.cs.value(1)
+
 
 class Display:
     WIDTH = 320
@@ -118,6 +126,8 @@ class Display:
         self.cpu_history = []
         self.cpu_chart_x = 0
         self.cpu_chart_prev_y = None
+        self.cpu_chart_buf = None
+        self.cpu_chart_fb = None
         self._init_backlight()
         self._init_lcd()
 
@@ -329,6 +339,13 @@ class Display:
     def _clear_value(self, x, y, w, h):
         self.lcd.fill_rect(x, y, w, h, self.PANEL if y > 26 and y < 218 else self.BG)
 
+    @micropython.viper
+    def _swap_bytes(self, buf: ptr8, size: int):
+        for i in range(0, size, 2):
+            tmp = buf[i]
+            buf[i] = buf[i + 1]
+            buf[i + 1] = tmp
+
     def _text(self, x, y, text, color, bg=None):
         try:
             import framebuf
@@ -340,8 +357,7 @@ class Display:
             fb = framebuf.FrameBuffer(buf, width, 8, framebuf.RGB565)
             fb.fill(bg_color)
             fb.text(text, 0, 0, color)
-            for index in range(0, len(buf), 2):
-                buf[index], buf[index + 1] = buf[index + 1], buf[index]
+            self._swap_bytes(buf, len(buf))
             self.lcd._set_window(x, y, x + width - 1, y + 7)
             self.lcd.cs.value(0)
             self.lcd.dc.value(1)
@@ -349,6 +365,20 @@ class Display:
             self.lcd.cs.value(1)
         except Exception:
             pass
+
+    @micropython.viper
+    def _scale_2x(self, src: ptr16, dst: ptr16, src_w: int, src_h: int, dst_w: int):
+        for sy in range(src_h):
+            src_row = sy * src_w
+            dst_row1 = (sy * 2) * dst_w
+            dst_row2 = (sy * 2 + 1) * dst_w
+            for sx in range(src_w):
+                pixel = src[src_row + sx]
+                dx = sx * 2
+                dst[dst_row1 + dx] = pixel
+                dst[dst_row1 + dx + 1] = pixel
+                dst[dst_row2 + dx] = pixel
+                dst[dst_row2 + dx + 1] = pixel
 
     def _text_big(self, x, y, text, color):
         try:
@@ -371,16 +401,8 @@ class Display:
             dst_fb = framebuf.FrameBuffer(dst_buf, dst_width, dst_height, framebuf.RGB565)
             dst_fb.fill(self.PANEL)
 
-            for sy in range(src_height):
-                for sx in range(src_width):
-                    pixel = src_fb.pixel(sx, sy)
-                    dst_fb.pixel(sx * 2, sy * 2, pixel)
-                    dst_fb.pixel(sx * 2 + 1, sy * 2, pixel)
-                    dst_fb.pixel(sx * 2, sy * 2 + 1, pixel)
-                    dst_fb.pixel(sx * 2 + 1, sy * 2 + 1, pixel)
-
-            for index in range(0, len(dst_buf), 2):
-                dst_buf[index], dst_buf[index + 1] = dst_buf[index + 1], dst_buf[index]
+            self._scale_2x(src_buf, dst_buf, src_width, src_height, dst_width)
+            self._swap_bytes(dst_buf, len(dst_buf))
             self.lcd._set_window(x, y, x + dst_width - 1, y + dst_height - 1)
             self.lcd.cs.value(0)
             self.lcd.dc.value(1)
@@ -521,42 +543,72 @@ class Display:
                         self.lcd.fill_rect(px, py, 1, 1, self.BLUE)
 
     def _update_cpu_chart_column(self, cpu_value):
-        x, y, w, h = 10, 86, 92, 60
+        import framebuf
 
-        if self.cpu_chart_x >= w:
-            self.lcd.fill_rect(x, y, w, h, self.PANEL)
+        chart_x, chart_y, chart_w, chart_h = 10, 86, 92, 60
+
+        # 初始化framebuffer（只在第一次）
+        if self.cpu_chart_buf is None:
+            self.cpu_chart_buf = bytearray(chart_w * chart_h * 2)
+            self.cpu_chart_fb = framebuf.FrameBuffer(self.cpu_chart_buf, chart_w, chart_h, framebuf.RGB565)
+            self.cpu_chart_fb.fill(self.PANEL)
+            # 绘制网格线
             for percent in (25, 50, 75):
-                line_y = y + h - int(percent * h / 100)
-                for i in range(0, w, 4):
-                    self.lcd.fill_rect(x + i, line_y, 2, 1, self.GRID)
+                line_y = chart_h - int(percent * chart_h / 100)
+                for i in range(0, chart_w, 4):
+                    self.cpu_chart_fb.pixel(i, line_y, self.GRID)
+                    if i + 1 < chart_w:
+                        self.cpu_chart_fb.pixel(i + 1, line_y, self.GRID)
+
+        # 图表满了，重置
+        if self.cpu_chart_x >= chart_w:
             self.cpu_chart_x = 0
             self.cpu_chart_prev_y = None
+            self.cpu_chart_fb.fill(self.PANEL)
+            for percent in (25, 50, 75):
+                line_y = chart_h - int(percent * chart_h / 100)
+                for i in range(0, chart_w, 4):
+                    self.cpu_chart_fb.pixel(i, line_y, self.GRID)
+                    if i + 1 < chart_w:
+                        self.cpu_chart_fb.pixel(i + 1, line_y, self.GRID)
 
-        new_y = y + h - int(cpu_value * h / 100)
-        col_x = x + self.cpu_chart_x
+        new_y = chart_h - int(cpu_value * chart_h / 100)
+        col_x = self.cpu_chart_x
 
-        self.lcd.fill_rect(col_x, y, 1, h, self.PANEL)
+        # 清除当前列
+        for py in range(chart_h):
+            self.cpu_chart_fb.pixel(col_x, py, self.PANEL)
 
+        # 重绘网格线
         for percent in (25, 50, 75):
-            line_y = y + h - int(percent * h / 100)
-            if line_y >= y and line_y < y + h:
-                self.lcd.fill_rect(col_x, line_y, 1, 1, self.GRID)
+            line_y = chart_h - int(percent * chart_h / 100)
+            if 0 <= line_y < chart_h:
+                self.cpu_chart_fb.pixel(col_x, line_y, self.GRID)
 
+        # 绘制折线
         if self.cpu_chart_prev_y is not None:
             dy = abs(new_y - self.cpu_chart_prev_y)
             if dy <= 1:
-                self.lcd.fill_rect(col_x, new_y, 1, 1, self.BLUE)
+                self.cpu_chart_fb.pixel(col_x, new_y, self.BLUE)
             elif dy < 20:
-                steps = dy
                 dy_sign = 1 if new_y > self.cpu_chart_prev_y else -1
-                for s in range(steps + 1):
+                for s in range(dy + 1):
                     py = self.cpu_chart_prev_y + s * dy_sign
-                    self.lcd.fill_rect(col_x, py, 1, 1, self.BLUE)
+                    if 0 <= py < chart_h:
+                        self.cpu_chart_fb.pixel(col_x, py, self.BLUE)
             else:
-                self.lcd.fill_rect(col_x, self.cpu_chart_prev_y, 1, 1, self.BLUE)
-                self.lcd.fill_rect(col_x, new_y, 1, 1, self.BLUE)
+                if 0 <= self.cpu_chart_prev_y < chart_h:
+                    self.cpu_chart_fb.pixel(col_x, self.cpu_chart_prev_y, self.BLUE)
+                if 0 <= new_y < chart_h:
+                    self.cpu_chart_fb.pixel(col_x, new_y, self.BLUE)
         else:
-            self.lcd.fill_rect(col_x, new_y, 1, 1, self.BLUE)
+            if 0 <= new_y < chart_h:
+                self.cpu_chart_fb.pixel(col_x, new_y, self.BLUE)
+
+        # 传输到LCD
+        self._swap_bytes(self.cpu_chart_buf, len(self.cpu_chart_buf))
+        self.lcd.blit_rgb565(chart_x, chart_y, chart_w, chart_h, self.cpu_chart_buf)
+        self._swap_bytes(self.cpu_chart_buf, len(self.cpu_chart_buf))
 
         self.cpu_chart_prev_y = new_y
         self.cpu_chart_x += 2
